@@ -8,6 +8,8 @@ import (
 	"net"
 	"net/url"
 	"strings"
+
+	"golang.org/x/net/proxy"
 )
 
 func main() {
@@ -48,30 +50,33 @@ func handleClientRequest(client net.Conn) {
 		return
 	}
 
-	if hostPortURL.Opaque == "443" { //https访问
+	if hostPortURL.Opaque == "443" { //https
 		address = hostPortURL.Scheme + ":443"
-	} else { //http访问
-		if strings.Index(hostPortURL.Host, ":") == -1 { //host不带端口， 默认80
+	} else { //http
+		if strings.Index(hostPortURL.Host, ":") == -1 { //http port 80 by default
 			address = hostPortURL.Host + ":80"
 		} else {
 			address = hostPortURL.Host
 		}
-	
+
 	}
 
-	//获得了请求的host和port，就开始拨号吧
-	server, err := net.Dial("tcp", address)
+	scoks5Dialer, err := proxy.SOCKS5("tcp", "127.0.0.1:51837", nil, proxy.Direct)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	server, err := scoks5Dialer.Dial("tcp", address)
 	if err != nil {
 		log.Println(err)
 		return
 	}
 	if method == "CONNECT" {
-		fmt.Fprint(client, "HTTP/1.1 200 Connection established\r\n\r\n")
+		fmt.Fprint(client, "HTTP/1.1 200 Connection established\n\n")
 	} else {
 		server.Write(b[:n])
 	}
-	//进行转发
+
 	go io.Copy(server, client)
 	io.Copy(client, server)
 }
-
